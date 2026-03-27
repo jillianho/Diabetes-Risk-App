@@ -277,7 +277,7 @@ h1, h2, h3, h4, h5, h6, .main-header, .section-header {
 """, unsafe_allow_html=True)
 
 st.set_page_config(
-    page_title="Diabetes Risk Predictor",
+    page_title="Interpretable Diabetes Risk & Intervention Simulator",
     page_icon="🩺",
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -287,7 +287,7 @@ with open("model.pkl", "rb") as f:
     model = pickle.load(f)
 
 # Header with better styling
-st.markdown('<h1 class="main-header">🩺 Diabetes Risk Predictor</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">🩺 Interpretable Diabetes Risk & Intervention Simulator</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Get personalized insights about your diabetes risk based on your health profile</p>', unsafe_allow_html=True)
 
 with st.expander("ℹ️ What do these measurements mean?"):
@@ -353,14 +353,14 @@ def synced_slider_number(label, min_value, max_value, value, step=None, format=N
 
 # Basic Information
 st.markdown("### 📊 Basic Information")
-pregnancies = synced_slider_number("Pregnancies", 0, 20, 1, step=1, key="pregnancies")
-bmi = synced_slider_number("BMI (kg/m²)", 15.0, 50.0, 25.0, step=0.1, format="%.1f", key="bmi")
-age = synced_slider_number("Age (years)", 18, 100, 30, step=1, key="age")
-blood_pressure = synced_slider_number("Blood Pressure - Diastolic (mmHg)", 50, 120, 80, step=1, key="blood_pressure")
+pregnancies = synced_slider_number("Pregnancies", 0, 20, 0, step=1, key="pregnancies")
+bmi = synced_slider_number("BMI (kg/m²)", 0.0, 50.0, 0.0, step=0.1, format="%.1f", key="bmi")
+age = synced_slider_number("Age (years)", 0, 100, 0, step=1, key="age")
+blood_pressure = synced_slider_number("Blood Pressure - Diastolic (mmHg)", 0, 120, 0, step=1, key="blood_pressure")
 
 # Additional Health Factors
 st.markdown("### 🏃 Additional Health Factors")
-waist_circumference = synced_slider_number("Waist Circumference (cm)", 50, 150, 80, step=1, key="waist")
+waist_circumference = synced_slider_number("Waist Circumference (cm)", 0, 150, 0, step=1, key="waist")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -396,13 +396,13 @@ with col1:
     know_glucose = st.checkbox("I know my glucose value")
     glucose = None
     if know_glucose:
-        glucose = synced_slider_number("Glucose (mg/dL)", 50, 300, 100, step=1, key="glucose")
+        glucose = synced_slider_number("Glucose (mg/dL)", 0, 300, 0, step=1, key="glucose")
 
 with col2:
     know_insulin = st.checkbox("I know my insulin value")
     insulin = None
     if know_insulin:
-        insulin = synced_slider_number("Insulin (µU/mL)", 0, 100, 10, step=1, key="insulin")
+        insulin = synced_slider_number("Insulin (µU/mL)", 0, 100, 0, step=1, key="insulin")
 
 # Helper functions used in prediction output. Placed before serialize-time call path.
 def compute_findrisc(patient: PatientInputs) -> int:
