@@ -1,6 +1,11 @@
 from dataclasses import dataclass
 from typing import Optional
 
+# Proxy functions in this file are heuristic approximations intended for
+# educational risk exploration only. They are not diagnostic substitutions for
+# fasting lab tests. FINDRISC-inspired rules are adapted from public screening
+# guidance and simplified for this app's user input surface.
+
 
 @dataclass
 class PatientInputs:

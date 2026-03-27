@@ -1,90 +1,50 @@
 import streamlit as st
 import pickle
-import numpy as np
 import pandas as pd
-import json
+from pathlib import Path
 from diabetes_proxies import PatientInputs, build_feature_vector, generate_results_content
+
+st.set_page_config(
+    page_title="Diabetes Risk & Intervention Simulator",
+    page_icon="🩺",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+
+def load_css(file_name: str = "styles.css") -> None:
+    css_path = Path(__file__).with_name(file_name)
+    if css_path.exists():
+        st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+
+
+def build_result_summary(data: dict) -> str:
+    lines = [
+        "Diabetes Risk Summary",
+        "=====================",
+        f"Estimated risk: {data.get('risk_pct', 'N/A')}% ({data.get('risk_label', 'N/A')})",
+        f"Fasting glucose: {data.get('glucose_display', 'N/A')} mg/dL",
+        f"Insulin resistance tier: {data.get('ir_tier', 'N/A')} (HOMA-IR {data.get('homa_range', 'N/A')})",
+        f"FINDRISC score: {data.get('findrisc', 'N/A')} ({data.get('findrisc_label', 'N/A')})",
+        "",
+        "Top actions:",
+    ]
+    for idx, action in enumerate(data.get("actions", [])[:5], start=1):
+        lines.append(f"{idx}. {action.get('title', 'N/A')} - {action.get('delta', '')}")
+    lines.extend([
+        "",
+        "Important: This tool is not medical advice and is not a diagnosis.",
+        "Confirm decisions with a licensed healthcare professional.",
+    ])
+    return "\n".join(lines)
+
+
+load_css()
 
 if "page" not in st.session_state:
     st.session_state["page"] = "input"
 
 if st.session_state["page"] == "results":
-    st.markdown("""
-    <style>
-    .results-wrap { padding-top: 0.25rem; }
-    .risk-hero { text-align: center; padding: 1rem 0 0.5rem; }
-    .dial-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 1rem; }
-    .dial {
-        --pct: 67;
-        --dial-color: #E24B4A;
-        width: 220px;
-        height: 120px;
-        border-top-left-radius: 220px;
-        border-top-right-radius: 220px;
-        overflow: hidden;
-        position: relative;
-        background:
-            conic-gradient(from 180deg, var(--dial-color) calc(var(--pct) * 1.8deg), #f1efe8 0deg);
-    }
-    .dial::before {
-        content: "";
-        position: absolute;
-        left: 22px;
-        right: 22px;
-        top: 22px;
-        bottom: -98px;
-        background: white;
-        border-top-left-radius: 180px;
-        border-top-right-radius: 180px;
-    }
-    .dial::after {
-        content: "";
-        position: absolute;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: #141414;
-        left: calc(50% + (var(--pct) - 50) * 1.35px - 8px);
-        top: 12px;
-        box-shadow: 0 0 0 4px rgba(255,255,255,.96);
-    }
-    .risk-num { font-size: 56px; font-weight: 600; color: #1f2d46; line-height: 1; }
-    .risk-sub { font-size: 13px; color: #667085; margin-top: 6px; }
-    .risk-pill { display: inline-block; margin-top: 10px; padding: 4px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-    .pill-low { background: #e6f9f0; color: #2b8a50; }
-    .pill-mod { background: #fff4e5; color: #b86908; }
-    .pill-high { background: #ffe7e7; color: #d72e30; }
-    .pill-calm { background: #e6f7ff; color: #0d7ea2; }
-    .pill-action { background: #fff4e5; color: #b86908; }
-    .pill-urgent { background: #ffe7e7; color: #d72e30; }
-    .metric-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
-    .metric-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #667085; margin-bottom: 6px; }
-    .metric-value { font-size: 30px; font-weight: 700; color: #1f2d46; }
-    .metric-note { font-size: 12px; color: #667085; margin-top: 4px; }
-    .framing-box { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; background: #fff; margin: 0.5rem 0 1rem; }
-    .framing-summary { font-size: 14px; color: #1f2d46; line-height: 1.7; margin-bottom: 12px; }
-    .framing-pills { display: flex; gap: 8px; flex-wrap: wrap; }
-    .bar-row { margin: 12px 0; }
-    .bar-head { display: flex; justify-content: space-between; font-size: 13px; color: #1f2d46; margin-bottom: 4px; }
-    .bar-track { width: 100%; height: 8px; background: #eef2f7; border-radius: 999px; overflow: hidden; }
-    .bar-risk { height: 100%; background: #E24B4A; }
-    .bar-protect { height: 100%; background: #639922; }
-    .action-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
-    .action-badge { display: inline-block; margin-bottom: 6px; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; }
-    .badge-impact { background: #ffe7e7; color: #d72e30; }
-    .badge-fast { background: #e6f9f0; color: #2b8a50; }
-    .badge-doctor { background: #fff4e5; color: #b86908; }
-    .badge-mod { background: #e6f7ff; color: #0d7ea2; }
-    .action-title { font-size: 14px; font-weight: 600; color: #1f2d46; margin-bottom: 4px; }
-    .action-desc { font-size: 13px; color: #667085; }
-    .action-delta { font-size: 12px; color: #2b8a50; font-weight: 600; margin-top: 6px; }
-    .prov-item { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 13px; color: #1f2d46; }
-    .prov-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
-    .prov-user { background: #e6f9f0; color: #2b8a50; }
-    .prov-est { background: #e6f7ff; color: #0d7ea2; }
-    </style>
-    """, unsafe_allow_html=True)
-
     if st.button("← Back to calculator"):
         st.session_state["page"] = "input"
         st.rerun()
@@ -140,6 +100,7 @@ if st.session_state["page"] == "results":
 
         with tab_breakdown:
             st.markdown(data["breakdown_headline"])
+            st.info("Some inputs (such as glucose/insulin/skin thickness/proxy pedigree) may be estimated using heuristics when not provided directly. Use clinical lab tests for confirmation.")
             st.markdown("##### Risk drivers")
             for factor in data.get("risk_factor_bars", []):
                 st.markdown(
@@ -188,6 +149,13 @@ if st.session_state["page"] == "results":
             st.markdown("#### Lab tests")
             for item in data.get("lab_tests", []):
                 st.markdown(f"- {item}")
+            st.download_button(
+                label="Download plain-text result summary",
+                data=build_result_summary(data),
+                file_name="diabetes_risk_summary.txt",
+                mime="text/plain",
+            )
+            st.warning("This calculator does not provide medical advice or diagnosis. Clinical interpretation by a licensed professional is required.")
 
         st.markdown('</div>', unsafe_allow_html=True)
     else:
@@ -196,99 +164,13 @@ if st.session_state["page"] == "results":
 
     st.stop()
 
-# Custom CSS for better styling
-st.markdown("""
-<style>
-:root, body, .stApp, .root {
-    font-family: inherit !important;
-}
-
-h1, h2, h3, h4, h5, h6, .main-header, .section-header {
-    font-family: inherit !important;
-}
-
-.stTextInput input, .stNumberInput input, .stSelectbox select, .stRadio label, .stCheckbox label, .stButton button {
-    font-family: 'Source Sans Pro', 'Source Sans 3', sans-serif !important;
-
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #1f77b4;
-        text-align: center;
-        margin-bottom: 1rem;
-    }
-    .subtitle {
-        font-size: 1.2rem;
-        color: #666;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .section-header {
-        font-size: 1.4rem;
-        font-weight: 600;
-        color: #2c3e50;
-        margin-top: 1.5rem;
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 2px solid #3498db;
-    }
-    .metric-card {
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #3498db;
-        margin-bottom: 1rem;
-    }
-    .risk-low {
-        color: #27ae60;
-        font-weight: 600;
-    }
-    .risk-medium {
-        color: #f39c12;
-        font-weight: 600;
-    }
-    .risk-high {
-        color: #e74c3c;
-        font-weight: 600;
-    }
-    .stButton>button {
-        background-color: #3498db;
-        color: white;
-        font-weight: 600;
-        border-radius: 8px;
-        padding: 0.5rem 2rem;
-        border: none;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .stButton>button:hover {
-        background-color: #2980b9;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-    }
-    .disclaimer {
-        background-color: #fff3cd;
-        border: 1px solid #ffeaa7;
-        border-radius: 8px;
-        padding: 1rem;
-        margin-top: 2rem;
-        font-size: 0.9rem;
-        color: #856404;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-st.set_page_config(
-    page_title="Diabetes Risk & Intervention Simulator",
-    page_icon="🩺",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
-
 with open("model.pkl", "rb") as f:
     model = pickle.load(f)
 
 # Header with better styling
 st.markdown('<h1 class="main-header">🩺 Diabetes Risk & Intervention Simulator</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Get personalized insights about your diabetes risk based on your health profile</p>', unsafe_allow_html=True)
+st.error("Medical disclaimer: This app provides an educational risk estimate only and is not a diagnosis or treatment recommendation. Always consult a licensed healthcare professional.")
 
 with st.expander("ℹ️ What do these measurements mean?"):
     st.markdown("""
@@ -303,6 +185,11 @@ with st.expander("ℹ️ What do these measurements mean?"):
     **Waist Circumference**: Measured around the narrowest part of your waist
 
     *If you don't have recent medical test results, the app will estimate values based on your health profile.*
+
+    **Important limitations:**
+    - Several values can be estimated using heuristics (approximations), not lab measurements.
+    - Model probabilities may not be perfectly calibrated for every population.
+    - This is a screening aid, not medical advice.
     """)
 
 st.markdown('<h2 class="section-header">Health Information</h2>', unsafe_allow_html=True)
@@ -403,6 +290,22 @@ with col2:
     insulin = None
     if know_insulin:
         insulin = synced_slider_number("Insulin (µU/mL)", 0, 100, 0, step=1, key="insulin")
+
+# Soft sanity warnings for improbable values.
+input_warnings = []
+if age < 18:
+    input_warnings.append("Age under 18: this model was not designed for pediatric diagnosis.")
+if bmi < 15:
+    input_warnings.append("BMI is very low; confirm your value.")
+if blood_pressure < 50:
+    input_warnings.append("Diastolic blood pressure looks unusually low; confirm your value.")
+if waist_circumference < 55:
+    input_warnings.append("Waist circumference looks unusually low; confirm your value.")
+if know_glucose and glucose is not None and glucose < 60:
+    input_warnings.append("Fasting glucose under 60 mg/dL is uncommon; verify this measurement.")
+
+for warning in input_warnings:
+    st.warning(warning)
 
 # Helper functions used in prediction output. Placed before serialize-time call path.
 def compute_findrisc(patient: PatientInputs) -> int:
@@ -542,6 +445,20 @@ def analyze_risk_factors(features: dict) -> list:
 
 
 if st.button("Predict Risk"):
+    required_errors = []
+    if age <= 0:
+        required_errors.append("Age must be greater than 0.")
+    if bmi <= 0:
+        required_errors.append("BMI must be greater than 0.")
+    if blood_pressure <= 0:
+        required_errors.append("Diastolic blood pressure must be greater than 0.")
+    if waist_circumference <= 0:
+        required_errors.append("Waist circumference must be greater than 0.")
+
+    if required_errors:
+        st.error("Please fix these values before predicting:\n- " + "\n- ".join(required_errors))
+        st.stop()
+
     # Convert display values to internal format
     family_history_map = {
         "None": "none",
