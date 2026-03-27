@@ -277,7 +277,7 @@ h1, h2, h3, h4, h5, h6, .main-header, .section-header {
 """, unsafe_allow_html=True)
 
 st.set_page_config(
-    page_title="Interpretable Diabetes Risk & Intervention Simulator",
+    page_title="Diabetes Risk & Intervention Simulator",
     page_icon="🩺",
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -287,7 +287,7 @@ with open("model.pkl", "rb") as f:
     model = pickle.load(f)
 
 # Header with better styling
-st.markdown('<h1 class="main-header">🩺 Interpretable Diabetes Risk & Intervention Simulator</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">🩺 Diabetes Risk & Intervention Simulator</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Get personalized insights about your diabetes risk based on your health profile</p>', unsafe_allow_html=True)
 
 with st.expander("ℹ️ What do these measurements mean?"):
